@@ -1,0 +1,42 @@
+name: Publish Docker Image
+
+on:
+  push:
+    tags:
+      - 'v*.*.*'
+
+env:
+  PLATFORMS: linux/amd64,linux/arm64,linux/arm/v7,linux/arm/v6
+
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: battila7/get-version-action@v2
+        id: version
+      - uses: actions/checkout@v2
+        with:
+          repository: 'RedisInsight/RedisInsight'
+          ref: ${{ steps.version.outputs.version-without-v }}
+      - uses: docker/metadata-action@v4
+        id: meta
+        with:
+          images: |
+            liquidjs/redisinsight
+          tags: |
+            type=semver,pattern={{version}}
+            type=semver,pattern={{major}}.{{minor}}
+            type=semver,pattern={{major}}
+      - uses: docker/setup-qemu-action@v1
+      - uses: docker/setup-buildx-action@v1
+      - uses: docker/login-action@v1
+        with:
+          username: ${{ secrets.DOCKERHUB_USERNAME }}
+          password: ${{ secrets.DOCKERHUB_TOKEN }}
+      - uses: docker/build-push-action@v2
+        with:
+          context: .
+          platforms: ${{ env.PLATFORMS }}
+          push: ${{ github.event_name != 'pull_request' }}
+          tags: ${{ steps.meta.outputs.tags }}
+          labels: ${{ steps.meta.outputs.labels }}
